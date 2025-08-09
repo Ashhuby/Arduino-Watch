@@ -1,114 +1,149 @@
 #include <Wire.h>
-#include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
 #include "RTClib.h"
 #include "MAX30105.h"
 #include "heartRate.h"
+#include <MPU6050.h>
 
-#define SCREEN_WIDTH 128
+// Reduced display size and buffer
+#define SCREEN_WIDTH 64
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+// RTC - using minimal DateTime
 RTC_DS3231 rtc;
-MAX30105 particleSensor;
 
-const byte RATE_SIZE = 6;
+// Heart rate sensor with reduced buffer
+MAX30105 particleSensor;
+const byte RATE_SIZE = 6;  // Reduced from 6
 byte rates[RATE_SIZE];
 byte rateSpot = 0;
-long lastBeat = 0;
+unsigned long lastBeat = 0;
+byte beatAvg = 0;  // Changed from int
+byte bpm;
 
-float beatsPerMinute;
-int beatAvg;
+// Step counter with optimized variables
+volatile uint16_t stepCount = 0;  // Using uint16_t instead of int
+float previousY = 0;
+bool stepDetected = false;
+MPU6050 mpu;
+
+// Memory tracking
+int freeRam() {
+  extern int __heap_start, *__brkval; 
+  int v; 
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+}
 
 void setup() {
-  Wire.begin();
-  Serial.begin(115200);
+  // Start with minimal Serial
+  Serial.begin(9600);  // Reduced from 115200 to save memory
+  Serial.print(F("Init... Free RAM: "));
+  Serial.println(freeRam());
 
-  // OLED Init
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("OLED allocation failed"));
-    while (true);
+  // Initialize I2C bus
+  Wire.begin();
+
+  // OLED with reduced buffer
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("OLED failed"));
+    while(1);
   }
   display.clearDisplay();
-  display.display();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
 
-  // RTC Init
-  if (!rtc.begin()) {
-    Serial.println("Couldn't find RTC");
-    while (true);
-  }
-  if (rtc.lostPower()) {
-    Serial.println("RTC lost power, setting time...");
-    // Uncomment once to set RTC to current compile time:
-    // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  // RTC - minimal initialization
+  if(!rtc.begin()) {
+    Serial.println(F("RTC failed"));
+    while(1);
   }
 
-  // MAX30105 Init
-  if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
-    Serial.println("MAX30102 not found");
-    while (true);
+  // Heart rate sensor
+  if(!particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {  // Reduced speed
+    Serial.println(F("MAX30105 failed"));
+    while(1);
   }
   particleSensor.setup();
   particleSensor.setPulseAmplitudeRed(0x0A);
-  particleSensor.setPulseAmplitudeGreen(0); // Turn off green LED
+  particleSensor.setPulseAmplitudeGreen(0);
 
-  delay(1500);
+  Serial.print(F("Sensors OK. Free RAM: "));
+  Serial.println(freeRam());
 }
 
 void loop() {
-  DateTime now = rtc.now();
+  static unsigned long lastUpdate = 0;
+  unsigned long now = millis();
 
-  long irValue = particleSensor.getIR();
-
-  if (checkForBeat(irValue)) {
-    long delta = millis() - lastBeat;
-    lastBeat = millis();
-
-    beatsPerMinute = 60 / (delta / 1000.0);
-
-    if (beatsPerMinute > 40 && beatsPerMinute < 210) {
-      rates[rateSpot++] = (byte)beatsPerMinute;
-      rateSpot %= RATE_SIZE;
-
-      beatAvg = 0;
-      for (byte i = 0; i < RATE_SIZE; i++) {
-        beatAvg += rates[i];
+  // Process sensors only every 50ms
+  if(now - lastUpdate >= 50) {
+    lastUpdate = now;
+    
+    // Get time (minimal processing)
+    DateTime time = rtc.now();
+    
+    // Heart rate monitoring
+    long irValue = particleSensor.getIR();
+    if(checkForBeat(irValue)) {
+      unsigned long delta = now - lastBeat;
+      lastBeat = now;
+      bpm = 60 / (delta / 1000.0);
+      if(bpm > 40 && bpm < 210) {
+        rates[rateSpot++] = bpm;
+        rateSpot %= RATE_SIZE;
+        beatAvg = 0;
+        for(byte i=0; i<RATE_SIZE; i++) beatAvg += rates[i];
+        beatAvg /= RATE_SIZE;
       }
-      beatAvg /= RATE_SIZE;
     }
+
+    // Step counting (simplified)
+    int16_t ax, ay, az;
+    mpu.getAcceleration(&ax, &ay, &az);
+
+    float accelY = ay / 16384.0; // Convert to g's
+    float threshold = 0.5;
+
+    if (!stepDetected && (accelY - previousY) > threshold) {
+      stepCount++;
+      stepDetected = true;
+      Serial.print("Step Count: ");
+      Serial.println(stepCount);
+    }
+
+    // Update display (minimal)
+    display.clearDisplay();
+    display.setCursor(0,0);
+    //display.print(F("BPM:"));
+    display.print(irValue < 50000 ? F("--") : String(beatAvg));
+    
+    display.setCursor(0,10);
+    //display.print(F("Steps:"));
+    display.print(stepCount);
+    
+    display.setCursor(0,22);
+    if(time.hour() < 10) display.print('0');
+    display.print(time.hour());
+    display.print(':');
+    if(time.minute() < 10) display.print('0');
+    display.print(time.minute());
+    
+    display.display();
   }
 
-  char timeBuffer[10];
-  sprintf(timeBuffer, "%02d:%02d", now.hour(), now.minute());
-
-  char bpmBuffer[10];
-  if (irValue < 50000) {
-    strcpy(bpmBuffer, "--");
-  } else {
-    sprintf(bpmBuffer, "%d", beatAvg);
+  // Minimal serial output
+  static unsigned long lastSerial = 0;
+  if(now - lastSerial > 1000) {
+    lastSerial = now;
+    //Serial.print(F("RAM:"));
+    //Serial.print(freeRam());
+    Serial.print(F(" BPM:"));
+    Serial.print(beatAvg);
+    Serial.print("       ");
+    Serial.print(bpm);
+    Serial.print(F(" Steps:"));
+    Serial.println(stepCount);
   }
-
-  display.clearDisplay();
-
-  // Draw only on left half
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.print(bpmBuffer);
-  
-  
-  display.setCursor(0, 20);
-  display.print("Step Count");
-  
-  display.setCursor(0, 50);
-  display.print(timeBuffer);
-
-  display.display();
-
-  Serial.print(", BPM=");
-  Serial.print(beatsPerMinute);
-  Serial.print(", Avg BPM=");
-  Serial.print(beatAvg);
-  if (irValue < 50000) Serial.print("          Dont see finger");
-  Serial.println();
 }
