@@ -7,7 +7,7 @@
 #include <MPU6050.h>
 
 // Reduced display size and buffer
-#define SCREEN_WIDTH 64
+#define SCREEN_WIDTH 32
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
