@@ -27,3 +27,9 @@
 ## You may want
 - Multimeter for Testing
 - Rework Station
+
+
+## Features
+
+<img src="Pictures/SpiderHand.jpg" width="50%" alt="PeterP">
+<img src="Pictures/NixFaceAlarm.jpg" width="50%" alt="NixAlarm">
