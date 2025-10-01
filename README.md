@@ -1,5 +1,7 @@
 # Arduino-Watch
 
+<img src="Pictures/Showcase.jpg" width="50%" alt="ShowcasePic">
+
 ## Parts list
 - 129 * 64 OLED LCD Display
 - **Solderable** PCB Breadboard
