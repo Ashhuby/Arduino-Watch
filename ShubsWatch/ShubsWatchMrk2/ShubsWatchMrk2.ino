@@ -213,7 +213,7 @@ void loop() {
 
   previousX = accelX;
 
-/*
+
   // Serial Monitor output for debugging
   Serial.print("Time=");
   Serial.print(now.hour());
@@ -227,7 +227,7 @@ void loop() {
   Serial.print(stepCount);
   if (irValue < 50000) Serial.print("  (No finger?)");
   Serial.println();
-*/
+
 
   // Oled output
   display.clearDisplay();
@@ -263,8 +263,8 @@ void loop() {
 
   display.display();
 
-  if(irValue < 1200) delay(9000);
-  else delay(50);
+  //if(irValue < 1200) delay(9000);
+  //else delay(50);
 }
 
 void playSong()
