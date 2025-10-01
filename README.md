@@ -28,6 +28,9 @@
 - Multimeter for Testing
 - Rework Station
 
+### Price
+Approx ≈ £55
+
 
 ## Features
 - Heart Rate Monitor
