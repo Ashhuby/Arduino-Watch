@@ -30,6 +30,15 @@
 
 
 ## Features
-
+- Heart Rate Monitor
+- Step Counter
+- Time Display
+  
 <img src="Pictures/SpiderHand.jpg" width="50%" alt="PeterP">
+
+### Alarm clock
+- Plays 'Mii Channel' theme
+- Displays Nix's face on the Display
+- Button to turn off the alarm
+
 <img src="Pictures/NixFaceAlarm.jpg" width="50%" alt="NixAlarm">
